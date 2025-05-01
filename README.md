@@ -150,3 +150,28 @@ Before committing this code to a public repository:
 4. **Use .gitignore**:
    - Add any files containing sensitive information to your .gitignore file
    - Example: `logs/`, `*.pem`, `credentials.json`
+## Development Setup
+
+This project uses pre-commit hooks to prevent committing sensitive information.
+
+### Basic Setup
+After cloning this repository, run the following command to set up git hooks:
+
+```bash
+./setup-hooks.sh
+```
+
+### Advanced Setup (Optional)
+For more comprehensive checks, you can use the pre-commit framework:
+
+1. Install pre-commit:
+   ```bash
+   pip install pre-commit
+   ```
+
+2. Install the git hooks:
+   ```bash
+   pre-commit install
+   ```
+
+Now, pre-commit checks will run automatically before each commit to prevent accidental exposure of sensitive information.

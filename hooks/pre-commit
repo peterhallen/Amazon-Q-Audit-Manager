@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Pre-commit hook to check for sensitive information
+# Place this file in .git/hooks/pre-commit and make it executable (chmod +x .git/hooks/pre-commit)
+
+echo "Running pre-commit checks for sensitive information..."
+
+# Files to check (staged files only)
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(py|sh|json|md|yaml|yml)$')
+
+if [ -z "$FILES" ]; then
+    echo "No relevant files to check."
+    exit 0
+fi
+
+# Patterns to check for
+PATTERNS=(
+    # AWS Account IDs (12-digit numbers)
+    '[0-9]{12}'
+    
+    # AWS ARNs
+    'arn:aws:[a-zA-Z0-9-]+:[a-zA-Z0-9-]*:[0-9]{12}'
+    
+    # UUIDs (like assessment IDs)
+    '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    
+    # AWS Profile names (common ones)
+    '(profile|PROFILE).*=.*"(default|prod|production|dev|development|staging|test|admin)"'
+    
+    # Usernames in paths
+    '/Users/[a-zA-Z0-9_-]+'
+    
+    # AWS Access Keys
+    'AKIA[0-9A-Z]{16}'
+    
+    # AWS Secret Keys (partial pattern)
+    '[0-9a-zA-Z/+]{40}'
+)
+
+# Allowlist patterns (these are okay to commit)
+ALLOWLIST=(
+    'YOUR_AWS_ACCOUNT_ID'
+    'YOUR_ASSESSMENT_ID'
+    'YOUR_AWS_PROFILE'
+    '\$HOME'
+    './logs'
+)
+
+# Function to check if a match is in the allowlist
+is_allowed() {
+    local match="$1"
+    
+    for allowed in "${ALLOWLIST[@]}"; do
+        if [[ "$match" =~ $allowed ]]; then
+            return 0  # Match is allowed
+        fi
+    done
+    
+    return 1  # Match is not allowed
+}
+
+# Check each file
+FOUND_SENSITIVE=0
+
+for FILE in $FILES; do
+    for PATTERN in "${PATTERNS[@]}"; do
+        # Find matches
+        MATCHES=$(grep -E "$PATTERN" "$FILE" || true)
+        
+        if [ ! -z "$MATCHES" ]; then
+            # Check each match against allowlist
+            while IFS= read -r LINE; do
+                if ! is_allowed "$LINE"; then
+                    if [ $FOUND_SENSITIVE -eq 0 ]; then
+                        echo "⚠️  WARNING: Potentially sensitive information found:"
+                        FOUND_SENSITIVE=1
+                    fi
+                    echo "File: $FILE"
+                    echo "Match: $LINE"
+                    echo "---"
+                fi
+            done <<< "$MATCHES"
+        fi
+    done
+done
+
+if [ $FOUND_SENSITIVE -eq 1 ]; then
+    echo "❌ Commit rejected due to potentially sensitive information."
+    echo "Please remove the sensitive information and try again."
+    echo "If this is a false positive, you can bypass this check with: git commit --no-verify"
+    exit 1
+else
+    echo "✅ No sensitive information detected."
+    exit 0
+fi
