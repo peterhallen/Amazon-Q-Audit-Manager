@@ -94,6 +94,21 @@ Set up regular evidence collection:
 python audit_manager_evidence_collector.py --accounts your-account-id --profile your-profile
 ```
 
+## Scheduling Evidence Collection
+
+To automate evidence collection, you can use the provided script:
+
+```bash
+# Run the evidence collection script manually
+./schedule_evidence_collection.sh
+
+# Set up a cron job to run it daily at 2 AM
+# Add this line to your crontab (run 'crontab -e' to edit)
+0 2 * * * /Users/peterhallen/code/audit_manager/schedule_evidence_collection.sh
+```
+
+This will collect evidence for all controls in your SOC2 assessment and log the results to the `logs` directory.
+
 ## Best Practices
 
 1. **IAM Roles**: Create dedicated IAM roles with least privilege for Audit Manager operations
@@ -108,9 +123,30 @@ python audit_manager_evidence_collector.py --accounts your-account-id --profile 
 - **Service Not Enabled**: Ensure Audit Manager is enabled in each account
 - **Missing Evidence**: Check control mapping and evidence sources
 - **StackSet Failures**: Review CloudFormation events for detailed error messages
-
 ## Additional Resources
 
 - [AWS Audit Manager Documentation](https://docs.aws.amazon.com/audit-manager/latest/userguide/what-is.html)
 - [AWS Audit Manager API Reference](https://docs.aws.amazon.com/audit-manager/latest/APIReference/Welcome.html)
 - [AWS CloudFormation StackSets](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/what-is-cfnstacksets.html)
+
+## Security Note
+
+Before committing this code to a public repository:
+
+1. **Replace Sensitive Information**: 
+   - In `schedule_evidence_collection.sh`, replace the placeholder values:
+     - `YOUR_AWS_PROFILE` with your actual AWS profile name
+     - `YOUR_AWS_ACCOUNT_ID` with your AWS account ID
+     - `YOUR_ASSESSMENT_ID` with your Audit Manager assessment ID
+
+2. **Lambda Function Configuration**:
+   - In `audit_manager_lambda/lambda_function.py`, replace `YOUR_ASSESSMENT_ID` with your actual assessment ID
+
+3. **Avoid Committing Secrets**:
+   - Never commit AWS access keys or secret keys
+   - Never commit personal information or sensitive paths
+   - Consider using environment variables for sensitive values
+
+4. **Use .gitignore**:
+   - Add any files containing sensitive information to your .gitignore file
+   - Example: `logs/`, `*.pem`, `credentials.json`

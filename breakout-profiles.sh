@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source credentials file
-CREDENTIALS_FILE="/Users/peterhallen/.aws/credentials"
+CREDENTIALS_FILE="$HOME/.aws/credentials"
 PROFILES_DIR="$HOME/.aws/profiles"
 
 # Create profiles directory if it doesn't exist

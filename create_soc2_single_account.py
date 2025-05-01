@@ -51,35 +51,34 @@ class SOC2AssessmentCreator:
         try:
             # List all frameworks
             frameworks = []
-            paginator = self.audit_manager_client.get_paginator('list_assessment_frameworks')
             
             # First check standard frameworks
-            for page in paginator.paginate(frameworkType='Standard'):
-                for framework in page['frameworkMetadataList']:
-                    if 'SOC 2' in framework['name']:
-                        print(f"Found SOC2 framework: {framework['name']} ({framework['id']})")
-                        return framework['id']
+            response = self.audit_manager_client.list_assessment_frameworks(frameworkType='Standard')
+            for framework in response.get('frameworkMetadataList', []):
+                if 'SOC 2' in framework['name'] or 'SOC2' in framework['name'] or 'Service Organizations Controls' in framework['name']:
+                    print(f"Found SOC2 framework: {framework['name']} ({framework['id']})")
+                    return framework['id']
             
             # Then check custom frameworks
-            for page in paginator.paginate(frameworkType='Custom'):
-                for framework in page['frameworkMetadataList']:
-                    if 'SOC 2' in framework['name']:
-                        print(f"Found custom SOC2 framework: {framework['name']} ({framework['id']})")
-                        return framework['id']
+            response = self.audit_manager_client.list_assessment_frameworks(frameworkType='Custom')
+            for framework in response.get('frameworkMetadataList', []):
+                if 'SOC 2' in framework['name'] or 'SOC2' in framework['name'] or 'Service Organizations Controls' in framework['name']:
+                    print(f"Found custom SOC2 framework: {framework['name']} ({framework['id']})")
+                    return framework['id']
             
-            print("SOC2 framework not found. Using default AWS SOC2 framework ARN.")
-            # Default SOC2 framework ARN if not found
-            return "arn:aws:auditmanager:us-east-1:068280491993:assessmentFramework/f5c5a0db-8a3e-4b1c-b1b0-a9a504a1ab8c"
+            print("SOC2 framework not found. Using default SOC2 framework ID.")
+            # Default SOC2 framework ID if not found
+            return "a3b2dc50-59c3-401d-8c0b-2fc123175d2d"
             
         except ClientError as e:
             print(f"Error getting SOC2 framework: {e}")
-            # Default SOC2 framework ARN if error
-            return "arn:aws:auditmanager:us-east-1:068280491993:assessmentFramework/f5c5a0db-8a3e-4b1c-b1b0-a9a504a1ab8c"
+            # Default SOC2 framework ID if error
+            return "a3b2dc50-59c3-401d-8c0b-2fc123175d2d"
     
     def check_audit_manager_enabled(self):
         """Check if Audit Manager is enabled"""
         try:
-            self.audit_manager_client.get_settings()
+            self.audit_manager_client.get_settings(attribute='ALL')
             return True
         except ClientError as e:
             if 'ResourceNotFoundException' in str(e):
@@ -123,7 +122,7 @@ class SOC2AssessmentCreator:
         try:
             # Get S3 bucket for assessment reports
             try:
-                settings = self.audit_manager_client.get_settings()
+                settings = self.audit_manager_client.get_settings(attribute='ALL')
                 default_destination = settings.get('defaultAssessmentReportsDestination', {})
                 destination = default_destination.get('destination', f"s3://audit-manager-reports-{self.account_id}-{self.region}")
             except ClientError:
@@ -155,8 +154,12 @@ class SOC2AssessmentCreator:
                 frameworkId=framework_id
             )
             
-            assessment_id = response['assessment']['id']
-            print(f"Created SOC2 assessment '{assessment_name}' with ID {assessment_id}")
+            print(f"Response: {response}")
+            assessment_id = response.get('assessment', {}).get('id')
+            if assessment_id:
+                print(f"Created SOC2 assessment '{assessment_name}' with ID {assessment_id}")
+            else:
+                print(f"Assessment created but couldn't get ID. Check AWS Console.")
             
             print("\nNext steps:")
             print("1. Log in to the AWS Management Console")

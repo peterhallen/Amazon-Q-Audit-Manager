@@ -97,9 +97,8 @@ class AuditManagerEvidenceCollector:
         assessments = []
         
         try:
-            paginator = audit_manager_client.get_paginator('list_assessments')
-            for page in paginator.paginate(status='ACTIVE'):
-                assessments.extend(page['assessmentMetadata'])
+            response = audit_manager_client.list_assessments(status='ACTIVE')
+            assessments.extend(response.get('assessmentMetadata', []))
             
             return assessments
         except ClientError as e:
@@ -111,9 +110,8 @@ class AuditManagerEvidenceCollector:
         control_sets = []
         
         try:
-            paginator = audit_manager_client.get_paginator('list_assessment_control_sets')
-            for page in paginator.paginate(assessmentId=assessment_id):
-                control_sets.extend(page['controlSets'])
+            response = audit_manager_client.list_assessment_control_sets(assessmentId=assessment_id)
+            control_sets.extend(response.get('controlSets', []))
             
             return control_sets
         except ClientError as e:
@@ -125,12 +123,11 @@ class AuditManagerEvidenceCollector:
         controls = []
         
         try:
-            paginator = audit_manager_client.get_paginator('list_assessment_controls')
-            for page in paginator.paginate(
+            response = audit_manager_client.list_assessment_controls(
                 assessmentId=assessment_id,
                 controlSetId=control_set_id
-            ):
-                controls.extend(page['controls'])
+            )
+            controls.extend(response.get('controls', []))
             
             return controls
         except ClientError as e:
@@ -140,19 +137,40 @@ class AuditManagerEvidenceCollector:
     def collect_manual_evidence(self, audit_manager_client, assessment_id, control_id):
         """Collect manual evidence for a control"""
         try:
+            # Get the control set ID for this control
+            assessment_details = audit_manager_client.get_assessment(assessmentId=assessment_id)
+            control_set_id = None
+            
+            # Find the control set ID that contains this control
+            for control_set in assessment_details['assessment']['framework']['controlSets']:
+                for control in control_set['controls']:
+                    if control['id'] == control_id:
+                        control_set_id = control_set['id']
+                        break
+                if control_set_id:
+                    break
+            
+            if not control_set_id:
+                print(f"Could not find control set ID for control {control_id}")
+                return False
+            
             # Example of uploading a manual evidence
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            evidence_text = f"This evidence was automatically collected by the audit_manager_evidence_collector.py script on {current_date}."
+            
+            print(f"Adding manual evidence for control {control_id} in control set {control_set_id}")
             response = audit_manager_client.batch_import_evidence_to_assessment_control(
                 assessmentId=assessment_id,
                 controlId=control_id,
+                controlSetId=control_set_id,
                 manualEvidence=[
                     {
-                        "evidenceName": f"Manual Evidence - {datetime.now().strftime('%Y-%m-%d')}",
-                        "evidenceDescription": "Automated evidence collection via script",
-                        "evidenceContent": "This evidence was automatically collected by the audit_manager_evidence_collector.py script."
+                        "textResponse": evidence_text
                     }
                 ]
             )
             
+            print(f"Evidence added successfully")
             return True
         except ClientError as e:
             print(f"Error collecting manual evidence for control {control_id}: {e}")
@@ -184,7 +202,7 @@ class AuditManagerEvidenceCollector:
         
         # Check if Audit Manager is enabled
         try:
-            audit_manager_client.get_settings()
+            audit_manager_client.get_settings(attribute='ALL')
         except ClientError as e:
             print(f"Account {account_id}: Audit Manager is not properly configured: {e}")
             return False
@@ -207,41 +225,38 @@ class AuditManagerEvidenceCollector:
         
         # Process each assessment
         for assessment in assessments:
-            assessment_id = assessment['id']
-            assessment_name = assessment['name']
+            assessment_id = assessment['metadata']['id']
+            assessment_name = assessment['metadata']['name']
             print(f"Account {account_id}: Processing assessment '{assessment_name}' ({assessment_id})")
             
-            # Get control sets
-            control_sets = self.get_control_sets(audit_manager_client, assessment_id)
-            if not control_sets:
-                print(f"Account {account_id}: No control sets found for assessment {assessment_id}")
-                continue
-            
-            # Process each control set
-            for control_set in control_sets:
-                control_set_id = control_set['id']
-                control_set_name = control_set['name']
-                print(f"Account {account_id}: Processing control set '{control_set_name}' ({control_set_id})")
+            # Get control sets from the assessment
+            try:
+                assessment_details = audit_manager_client.get_assessment(assessmentId=assessment_id)
+                control_sets = assessment_details['assessment']['framework']['controlSets']
                 
-                # Start automated evidence collection
-                self.start_evidence_collection(audit_manager_client, assessment_id, control_set_id)
-                
-                # Get controls
-                controls = self.get_controls(audit_manager_client, assessment_id, control_set_id)
-                if not controls:
-                    print(f"Account {account_id}: No controls found for control set {control_set_id}")
+                if not control_sets:
+                    print(f"Account {account_id}: No control sets found for assessment {assessment_id}")
                     continue
                 
-                # Process each control
-                for control in controls:
-                    control_id = control['id']
-                    control_name = control['name']
+                # Process each control set
+                for control_set in control_sets:
+                    control_set_id = control_set['id']
+                    control_set_name = control_set['description'] or control_set['id']
+                    print(f"Account {account_id}: Processing control set '{control_set_name}' ({control_set_id})")
                     
-                    # Collect manual evidence for demonstration purposes
-                    # In a real scenario, you might want to collect specific evidence based on the control
-                    if self.collect_manual_evidence(audit_manager_client, assessment_id, control_id):
-                        print(f"Account {account_id}: Collected evidence for control '{control_name}' ({control_id})")
-                        success = True
+                    # Process each control
+                    for control in control_set['controls']:
+                        control_id = control['id']
+                        control_name = control['name']
+                        
+                        # Collect manual evidence for demonstration purposes
+                        if self.collect_manual_evidence(audit_manager_client, assessment_id, control_id):
+                            print(f"Account {account_id}: Collected evidence for control '{control_name}' ({control_id})")
+                            success = True
+                
+            except ClientError as e:
+                print(f"Account {account_id}: Error processing assessment: {e}")
+                continue
             
         return success
     

@@ -4,10 +4,10 @@
 # This script helps manage AWS credentials for multiple accounts
 
 # Configuration
-AWS_CREDENTIALS_DIR="/Users/peterhallen/.aws/credentials"
-AWS_CONFIG_DIR="/Users/peterhallen/.aws/config"
-BACKUP_DIR="/Users/peterhallen/.aws/backups"
-PROFILES_DIR="/Users/peterhallen/.aws/profiles"
+AWS_CREDENTIALS_DIR="$HOME/.aws/credentials"
+AWS_CONFIG_DIR="$HOME/.aws/config"
+BACKUP_DIR="$HOME/.aws/backups"
+PROFILES_DIR="$HOME/.aws/profiles"
 
 # Create necessary directories if they don't exist
 mkdir -p "$BACKUP_DIR" "$PROFILES_DIR"
